@@ -1,8 +1,8 @@
-local Ui = require "mason.core.ui"
+local Ui = require "mason-core.ui"
 local p = require "mason.ui.palette"
-local _ = require "mason.core.functional"
+local _ = require "mason-core.functional"
 local settings = require "mason.settings"
-local log = require "mason.log"
+local log = require "mason-core.log"
 
 local LSPHelp = require "mason.ui.components.help.lsp"
 local DAPHelp = require "mason.ui.components.help.dap"
@@ -97,7 +97,7 @@ local function GenericHelp(state)
         Ui.HlTextNode {
             { p.Bold "Problems with package functionality" },
             {
-                p.muted "Please refer to each language package's own homepage for further assistance.",
+                p.muted "Please refer to each package's own homepage for further assistance.",
             },
         },
         Ui.EmptyLine(),
