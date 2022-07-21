@@ -6,11 +6,13 @@ local settings = require "mason-lspconfig.settings"
 local server_mapping = require "mason-lspconfig.mappings.server"
 local path = require "mason-core.path"
 local registry = require "mason-registry"
+local notify = require "mason-core.notify"
+local platform = require "mason-core.platform"
 
 local M = {}
 
 ---@param lspconfig_server_name string
-function M.resolve_package(lspconfig_server_name)
+local function resolve_package(lspconfig_server_name)
     return Optional.of_nilable(server_mapping.lspconfig_to_package[lspconfig_server_name]):map(function(package_name)
         local ok, pkg = pcall(registry.get_package, package_name)
         if ok then
@@ -20,7 +22,7 @@ function M.resolve_package(lspconfig_server_name)
 end
 
 ---@param lspconfig_server_name string
-function M.resolve_server_config_factory(lspconfig_server_name)
+local function resolve_server_config_factory(lspconfig_server_name)
     local ok, server_config = pcall(require, ("mason-lspconfig.server_configurations.%s"):format(lspconfig_server_name))
     if ok then
         return Optional.of(server_config)
@@ -60,6 +62,8 @@ end
 
 local function setup_lspconfig_hook()
     local util = require "lspconfig.util"
+    local win_exepath_compat = platform.is.win and require "mason-lspconfig.win-exepath-compat"
+
     util.on_setup = util.add_hook_before(util.on_setup, function(config)
         local pkg_name = server_mapping.lspconfig_to_package[config.name]
         if not pkg_name then
@@ -67,8 +71,16 @@ local function setup_lspconfig_hook()
         end
 
         if registry.is_installed(pkg_name) then
-            M.resolve_server_config_factory(config.name):if_present(function(config_factory)
-                merge_in_place(config, config_factory(path.package_prefix(pkg_name)))
+            resolve_server_config_factory(config.name):if_present(function(config_factory)
+                merge_in_place(config, config_factory({ install_dir = path.package_prefix(pkg_name) }, config))
+                if win_exepath_compat and win_exepath_compat[config.name] and config.cmd and config.cmd[1] then
+                    local exepath = vim.fn.exepath(config.cmd[1])
+                    if exepath ~= "" then
+                        config.cmd[1] = exepath
+                    else
+                        log.error("Failed to expand cmd path", config.name, config.cmd)
+                    end
+                end
             end)
         else
             if should_auto_install(config.name) then
@@ -82,7 +94,7 @@ end
 local function ensure_installed()
     for _, server_identifier in ipairs(settings.current.ensure_installed) do
         local server_name, version = Package.Parse(server_identifier)
-        M.resolve_package(server_name):if_present(
+        resolve_package(server_name):if_present(
             ---@param pkg Package
             function(pkg)
                 if not pkg:is_installed() then
@@ -107,9 +119,21 @@ function M.setup(config)
     require "mason-lspconfig.api.command"
 end
 
+---See `:h mason-lspconfig.setup_handlers()`
 ---@param handlers table<string, fun(server_name: string)>
 function M.setup_handlers(handlers)
     local default_handler = Optional.of_nilable(handlers[1])
+
+    _.each(function(handler)
+        if type(handler) == "string" and not server_mapping.lspconfig_to_package[handler] then
+            notify(
+                ("mason-lspconfig.setup_handlers: Received handler for unknown lspconfig server name: %s."):format(
+                    handler
+                ),
+                vim.log.levels.WARN
+            )
+        end
+    end, _.keys(handlers))
 
     ---@param pkg_name string
     local function get_server_name(pkg_name)
@@ -135,6 +159,13 @@ function M.setup_handlers(handlers)
             get_server_name(pkg.name):if_present(call_handler)
         end)
     )
+end
+
+---@return string[]
+function M.get_installed_servers()
+    return _.filter_map(function(pkg_name)
+        return Optional.of_nilable(server_mapping.package_to_lspconfig[pkg_name])
+    end, registry.get_installed_package_names())
 end
 
 return M

@@ -76,8 +76,8 @@ local function render_node(viewport_context, node, _render_context, _output)
     ---@field diagnostic {message: string, severity: integer, source: string|nil}
 
     ---@class RenderOutput
-    ---@field lines string[] @The buffer lines.
-    ---@field virt_texts string[][] @List of (text, highlight) tuples.
+    ---@field lines string[]: The buffer lines.
+    ---@field virt_texts string[][]: List of (text, highlight) tuples.
     ---@field highlights RenderHighlight[]
     ---@field keybinds RenderKeybind[]
     ---@field diagnostics RenderDiagnostic[]
@@ -168,7 +168,7 @@ M._render_node = render_node
 ---@alias WindowOpts {effects: table<string, fun()>, highlight_groups: table<string, table>, border: string|table}
 
 ---@param opts WindowOpenOpts
----@param sizes_only boolean @Whether to only return properties that control the window size.
+---@param sizes_only boolean: Whether to only return properties that control the window size.
 local function create_popup_window_opts(opts, sizes_only)
     local win_height = vim.o.lines - vim.o.cmdheight - 2 -- Add margin for status and buffer line
     local win_width = vim.o.columns
@@ -191,11 +191,11 @@ local function create_popup_window_opts(opts, sizes_only)
     return popup_layout
 end
 
----@param name string @Human readable identifier.
+---@param name string: Human readable identifier.
 ---@param filetype string
 function M.new_view_only_win(name, filetype)
     local namespace = vim.api.nvim_create_namespace(("installer_%s"):format(name))
-    local bufnr, renderer, mutate_state, get_state, unsubscribe, win_id, window_mgmt_augroup, autoclose_augroup, registered_keymaps, registered_keybinds, registered_effect_handlers
+    local bufnr, renderer, mutate_state, get_state, unsubscribe, win_id, window_mgmt_augroup, autoclose_augroup, registered_keymaps, registered_keybinds, registered_effect_handlers, sticky_cursor
     local has_initiated = false
     ---@type WindowOpts
     local window_opts = {}
@@ -261,7 +261,6 @@ function M.new_view_only_win(name, filetype)
             win_width = win_width,
         }
         local cursor_pos_pre_render = vim.api.nvim_win_get_cursor(win_id)
-        local sticky_cursor
         if output then
             sticky_cursor = output.sticky_cursors.line_map[cursor_pos_pre_render[1]]
         end
@@ -491,15 +490,26 @@ function M.new_view_only_win(name, filetype)
             vim.api.nvim_del_augroup_by_id(window_mgmt_augroup)
             vim.api.nvim_del_augroup_by_id(autoclose_augroup)
         end),
-        ---@param pos number[] @(row, col) tuple
+        ---@param pos number[]: (row, col) tuple
         set_cursor = function(pos)
             assert(win_id ~= nil, "Window has not been opened, cannot set cursor.")
             return vim.api.nvim_win_set_cursor(win_id, pos)
         end,
-        ---@return number[] @(row, col) tuple
+        ---@return number[]: (row, col) tuple
         get_cursor = function()
             assert(win_id ~= nil, "Window has not been opened, cannot get cursor.")
             return vim.api.nvim_win_get_cursor(win_id)
+        end,
+        ---@param tag any
+        set_sticky_cursor = function(tag)
+            if output then
+                local new_sticky_cursor_line = output.sticky_cursors.id_map[tag]
+                if new_sticky_cursor_line then
+                    sticky_cursor = tag
+                    local cursor = vim.api.nvim_win_get_cursor(win_id)
+                    vim.api.nvim_win_set_cursor(win_id, { new_sticky_cursor_line, cursor[2] })
+                end
+            end
         end,
     }
 end

@@ -7,7 +7,7 @@ let $mason = getcwd()
 let $test_helpers = getcwd() .. "/tests/helpers"
 let $dependencies = getcwd() .. "/dependencies"
 
-set rtp+=$mason,$test_helpers
+set rtp^=$mason,$test_helpers
 set packpath=$dependencies
 
 packloadall
@@ -18,9 +18,10 @@ lua require("test_helpers")
 lua <<EOF
 local index = require "mason-registry.index"
 index["dummy"] = "dummy_package"
+index["dummy2"] = "dummy_package"
 
 require("mason").setup {
-    install_root_dir = os.getenv("INSTALL_ROOT_DIR"),
+    install_root_dir = vim.env.INSTALL_ROOT_DIR,
 }
 EOF
 

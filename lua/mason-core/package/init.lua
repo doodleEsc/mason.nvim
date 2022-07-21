@@ -16,7 +16,7 @@ local version_checks = require "mason-core.package.version-check"
 ---@class Package : EventEmitter
 ---@field name string
 ---@field spec PackageSpec
----@field private handle InstallHandle @The currently associated handle.
+---@field private handle InstallHandle: The currently associated handle.
 local Package = setmetatable({}, { __index = EventEmitter })
 
 ---@param package_identifier string
@@ -101,7 +101,10 @@ function Package:install(opts)
             -- This function is not expected to be run in async scope, so we create
             -- a new scope here and handle the result callback-style.
             a.run(
-                installer.execute,
+                function(...)
+                    -- we wrap installer.execute for testing purposes (to allow spy objects)
+                    return installer.execute(...)
+                end,
                 ---@param success boolean
                 ---@param result Result
                 function(success, result)
@@ -165,7 +168,7 @@ function Package:get_install_path()
     return path.package_prefix(self.name)
 end
 
----@return Optional @Optional<@see InstallReceipt>
+---@return Optional: Optional<InstallReceipt>
 function Package:get_receipt()
     local receipt_path = path.concat { self:get_install_path(), "mason-receipt.json" }
     if fs.sync.file_exists(receipt_path) then

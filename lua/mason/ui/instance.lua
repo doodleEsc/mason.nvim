@@ -137,7 +137,7 @@ local mutate_state, get_state = window.state(INITIAL_STATE)
 
 ---@param pkg Package
 ---@param group string
----@param tail boolean|nil @Whether to insert at the end.
+---@param tail boolean|nil: Whether to insert at the end.
 local function mutate_package_grouping(pkg, group, tail)
     mutate_state(function(state)
         remove(state.packages.installing, pkg)
@@ -187,10 +187,10 @@ local function setup_handle(handle)
         end
     end
 
-    local function handle_spawninfo_change()
+    local function handle_spawnhandle_change()
         mutate_state(function(state)
             state.packages.states[handle.package.name].latest_spawn =
-                handle:peek_spawninfo_stack():map(tostring):or_else(nil)
+                handle:peek_spawn_handle():map(tostring):or_else(nil)
         end)
     end
 
@@ -229,14 +229,14 @@ local function setup_handle(handle)
 
     handle:on("terminate", handle_terminate)
     handle:on("state:change", handle_state_change)
-    handle:on("spawninfo:change", handle_spawninfo_change)
+    handle:on("spawn_handles:change", handle_spawnhandle_change)
     handle:on("stdout", handle_output)
     handle:on("stderr", handle_output)
 
     -- hydrate initial state
     handle_state_change(handle.state)
     handle_terminate()
-    handle_spawninfo_change()
+    handle_spawnhandle_change()
     mutate_state(function(state)
         state.packages.states[handle.package.name].tailed_output = {}
     end)
@@ -608,5 +608,8 @@ return {
     window = window,
     set_view = function(view)
         set_view { payload = view }
+    end,
+    set_sticky_cursor = function(tag)
+        window.set_sticky_cursor(tag)
     end,
 }
